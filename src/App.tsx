@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import * as z from "zod"
 import {
   Table,
   TableBody,
@@ -21,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Pencil, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 export interface Student {
   id: number;
@@ -32,6 +34,16 @@ export interface Student {
   year: string;
 }
 
+const studentSchema = z.object({
+  name: z.string().min(1, "Name is required")
+    .regex(/^[A-Za-z][A-Za-z0-9\s]*$/, "Name must start with a letter and can contain letters, numbers, and spaces"),
+  email: z.string().email("Invalid email address"),
+  age: z.number().min(1, "Age must be greater than 0"),
+  course: z.string().min(1, "Course is required"),
+  gpa: z.number().min(0, "GPA must be at least 0").max(4, "GPA must be at most 4"),
+  year: z.string().min(1, "Year is required"),
+})
+
 export default function App() {
 
   const [data, setData] = useState<Student[] | null>(null);
@@ -40,8 +52,10 @@ export default function App() {
   const [isEdit, setIsEdit] = useState<boolean>(false)
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
 
+  const BASE_URL = import.meta.env.VITE_BASE_URL
+
   async function fetchData() {
-    const response = await fetch("https://backend-p1s8qhn3a3djhk4xegscivb1-3000.thekalkicinematicuniverse.com/")
+    const response = await fetch(`${BASE_URL}/student`)
     const data = await response.json()
     console.log(data)
     setData(data.data)
@@ -71,8 +85,16 @@ export default function App() {
 
   async function handleFormSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+
+    const parsed = studentSchema.safeParse(student)
+
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message)
+      return
+    }
+
     if (isEdit) {
-      const response = await fetch(`https://backend-p1s8qhn3a3djhk4xegscivb1-3000.thekalkicinematicuniverse.com/${student.id}`, {
+      const response = await fetch(`${BASE_URL}/student/${student.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -81,9 +103,10 @@ export default function App() {
       })
       setIsEdit(false)
       setIsDialogOpen(false)
+      toast.success("Student updated successfully")
     }
     else {
-      const response = await fetch("https://backend-p1s8qhn3a3djhk4xegscivb1-3000.thekalkicinematicuniverse.com/", {
+      const response = await fetch(`${BASE_URL}/student`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -92,16 +115,17 @@ export default function App() {
       })
       const data = await response.json()
       setIsDialogOpen(false)
+      toast.success("Student added successfully")
     }
     setStudent({})
     fetchData()
   }
 
   async function handleDelete(id: number) {
-    console.log(id)
-    const response = await fetch(`https://backend-p1s8qhn3a3djhk4xegscivb1-3000.thekalkicinematicuniverse.com/${id}`, {
+    const response = await fetch(`${BASE_URL}/student/${id}`, {
       method: "DELETE",
     })
+    toast.success("Student deleted successfully")
     fetchData()
   }
 
@@ -113,23 +137,15 @@ export default function App() {
     )
   }
 
-  if (data.length === 0 && !loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <h1>No Student Found</h1>
-      </div>
-    )
-  }
-
   return (
-    <div classNames=" flex justify-center items-center h-screen">
+    <div className=" h-screen w-screen p-16">
       <div className="flex justify-between items-center mb-10 px-24">
         <h1 className="text-3xl font-bold text-center mb-10">Student Management System</h1>
         <Dialog open={isDialogOpen} onOpenChange={() => {
           setIsDialogOpen(!isDialogOpen)
           setStudent({})
         }}>
-          <DialogTrigger asChild>
+          <DialogTrigger asChild className="mr-48">
             <Button>Add Student</Button>
           </DialogTrigger>
 
@@ -239,7 +255,7 @@ export default function App() {
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          {data.map((item: Student) => {
+          {data.map((item: Student) => { 
             return (
               <TableBody key={item.id}>
                 <TableRow>
