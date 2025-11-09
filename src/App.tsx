@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { useNavigate } from "react-router-dom"
 
 export interface Student {
   id: number;
@@ -44,8 +45,9 @@ const studentSchema = z.object({
   year: z.string().min(1, "Year is required"),
 })
 
-export default function App() {
 
+export default function App() {
+  const navigate = useNavigate()
   const [data, setData] = useState<Student[] | null>(null);
   const [student, setStudent] = useState<Student>({} as Student)
   const [loading, setLoading] = useState<boolean>(true)
@@ -57,7 +59,6 @@ export default function App() {
   async function fetchData() {
     const response = await fetch(`${BASE_URL}/student`)
     const data = await response.json()
-    console.log(data)
     setData(data.data)
     setLoading(false)
   }
@@ -129,6 +130,16 @@ export default function App() {
     fetchData()
   }
 
+  async function handleLogout() {
+    const response = await fetch(`${BASE_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    })
+    if (response.ok) {
+      navigate("/login", { replace: true })
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -139,6 +150,11 @@ export default function App() {
 
   return (
     <div className=" h-screen w-screen p-16">
+
+      <div className="flex justify-end items-center mb-10 px-24 ">
+       <Button variant="destructive" onClick={handleLogout}>Log Out</Button>
+      </div>
+
       <div className="flex justify-between items-center mb-10 px-24">
         <h1 className="text-3xl font-bold text-center mb-10">Student Management System</h1>
         <Dialog open={isDialogOpen} onOpenChange={() => {
