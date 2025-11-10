@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { z } from "zod"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/context/authContext"
 
 const userSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -26,6 +27,8 @@ const userSchema = z.object({
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { setUser } = useAuth() 
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -58,6 +61,7 @@ export default function LoginPage() {
         toast.error(data.message || "Login failed")
       } else {
         toast.success(data.message || "Login successful!")
+        setUser(data.user)
         navigate("/")
       }
     } catch (err) {

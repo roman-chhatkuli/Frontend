@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label"
 import { Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/context/authContext"
 
 export interface Student {
   id: number;
@@ -48,6 +49,8 @@ const studentSchema = z.object({
 
 export default function App() {
   const navigate = useNavigate()
+  const { setUser } = useAuth()
+
   const [data, setData] = useState<Student[] | null>(null);
   const [student, setStudent] = useState<Student>({} as Student)
   const [loading, setLoading] = useState<boolean>(true)
@@ -136,6 +139,7 @@ export default function App() {
       credentials: "include",
     })
     if (response.ok) {
+      setUser(null)
       navigate("/login", { replace: true })
     }
   }

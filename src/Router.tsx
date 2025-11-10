@@ -4,6 +4,7 @@ import Login from './pages/Login.tsx'
 import Signup from './pages/Signup.tsx'
 import { useAuth } from './context/authContext.tsx'
 import { Loader2 } from "lucide-react";
+import { Navigate } from 'react-router-dom';
 
 export default function Router() {
   const { user,loading } = useAuth()
@@ -19,9 +20,9 @@ export default function Router() {
 
   return (
     <Routes>
-      <Route path="/" element={user ?  <App /> : <Login />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+      <Route path="/" element={user ? <App /> : <Navigate to="/login" replace />} />
+      <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
+      <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/" replace />} />
     </Routes>
   )
 }

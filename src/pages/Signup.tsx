@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import * as z from "zod"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/context/authContext"
 
  const userSchema = z.object({
   fullName: z.string().min(5, "Full name is required and must be at least 5 characters"),
@@ -27,6 +28,8 @@ import { useNavigate } from "react-router-dom"
 
 export default function SignupPage() {
   const navigate = useNavigate()
+  const { setUser } = useAuth()
+
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -65,6 +68,7 @@ export default function SignupPage() {
         toast.error(data.message || "Signup failed")
       } else {
         toast.success("Account created successfully!")
+        setUser(data.user)
         navigate("/")
       }
     } catch (err) {

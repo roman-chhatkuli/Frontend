@@ -15,6 +15,7 @@ export function AuthProvider({ children }) {
           credentials: 'include'
         })
         const data = await response.json()
+        console.log(data)
         setUser(data.email)
       } catch (error) {
         console.error('Error fetching user:', error)
