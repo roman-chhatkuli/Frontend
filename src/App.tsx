@@ -25,6 +25,7 @@ import { Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/context/authContext"
+import { fetchStudents, deleteStudent, createStudent, updateStudent } from "./api/student.api.ts"
 
 export interface Student {
   id: number;
@@ -56,13 +57,11 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true)
   const [isEdit, setIsEdit] = useState<boolean>(false)
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
-
-  const BASE_URL = import.meta.env.VITE_BASE_URL
-
+  
   async function fetchData() {
-    const response = await fetch(`${BASE_URL}/student`)
-    const data = await response.json()
-    setData(data.data)
+    const respose = await fetchStudents()
+    console.log("Fetch Students: ", respose)
+    setData(respose.data)
     setLoading(false)
   }
 
@@ -98,26 +97,15 @@ export default function App() {
     }
 
     if (isEdit) {
-      const response = await fetch(`${BASE_URL}/student/${student.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(student),
-      })
+      const data = await updateStudent(student)
+      console.log("Update Student: ",data)
       setIsEdit(false)
       setIsDialogOpen(false)
       toast.success("Student updated successfully")
     }
     else {
-      const response = await fetch(`${BASE_URL}/student`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(student),
-      })
-      const data = await response.json()
+      const data = createStudent(student)
+      console.log("Create Student: ",data)
       setIsDialogOpen(false)
       toast.success("Student added successfully")
     }
@@ -126,9 +114,8 @@ export default function App() {
   }
 
   async function handleDelete(id: number) {
-    const response = await fetch(`${BASE_URL}/student/${id}`, {
-      method: "DELETE",
-    })
+    const response = deleteStudent(id)
+    console.log("Delete Student: ",response)
     toast.success("Student deleted successfully")
     fetchData()
   }
