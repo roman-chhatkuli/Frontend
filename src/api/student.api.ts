@@ -4,6 +4,9 @@ const BASE_URL = import.meta.env.VITE_BASE_URL
 
 export const fetchStudents = async () => {
   const response = await fetch(`${BASE_URL}/student`)
+  if (!response.ok) {
+    throw new Error("Failed to fetch students")
+  }
   const data = await response.json()
   return data
 }
@@ -17,7 +20,7 @@ export const updateStudent = async (student: Student) => {
     body: JSON.stringify(student),
   })
 
-  if(!response.ok) {
+  if (!response.ok) {
     throw new Error("Failed to update student")
   }
 
@@ -32,6 +35,11 @@ export const createStudent = async (student: Student) => {
     },
     body: JSON.stringify(student),
   })
+
+  if (!response.ok) {
+    throw new Error("Failed to create student")
+  }
+
   const data = await response.json()
   return data
 }
@@ -41,6 +49,9 @@ export const deleteStudent = async (id: number) => {
   const response = await fetch(`${BASE_URL}/student/${id}`, {
     method: "DELETE",
   })
+  if (!response.ok) {
+    throw new Error("Failed to delete student")
+  }
   const data = await response.json()
   return data
 }

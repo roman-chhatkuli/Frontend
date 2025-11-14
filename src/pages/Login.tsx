@@ -21,8 +21,7 @@ import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/context/authContext"
 
 const userSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email("Invalid email address")
 })
 
 export default function LoginPage() {
@@ -36,7 +35,7 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    const parsed = userSchema.safeParse({ email, password })
+    const parsed = userSchema.safeParse({ email })
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message)
       return
