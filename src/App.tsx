@@ -26,6 +26,7 @@ import { toast } from "sonner"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/context/authContext"
 import { fetchStudents, deleteStudent, createStudent, updateStudent } from "./api/student.api.ts"
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 export interface Student {
   id: number;
@@ -49,25 +50,61 @@ const studentSchema = z.object({
 
 
 export default function App() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { setUser } = useAuth()
 
-  const [data, setData] = useState<Student[] | null>(null);
   const [student, setStudent] = useState<Student>({} as Student)
-  const [loading, setLoading] = useState<boolean>(true)
   const [isEdit, setIsEdit] = useState<boolean>(false)
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
-  
-  async function fetchData() {
-    const respose = await fetchStudents()
-    console.log("Fetch Students: ", respose)
-    setData(respose.data)
-    setLoading(false)
-  }
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+// Fetch Students 
+  const { data: students, error, isLoading } = useQuery({
+    queryKey: ['students'],
+    queryFn: fetchStudents,
+  })
+
+  // Edit Students 
+  const updateMutate = useMutation({
+    mutationFn: updateStudent,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['students'])
+      console.log("Update Student Successful ")
+      setIsEdit(false)
+      setIsDialogOpen(false)
+      toast.success("Student updated successfully")
+    },
+    onError: (error) => {
+      toast.error(error.message)
+    }
+  })
+
+  //Create Student 
+  const createMutation = useMutation({
+    mutationFn: createStudent,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['students'])
+      console.log("student Created Successfully");
+      setIsDialogOpen(false)
+      toast.success("Student added successfully")
+    },
+    onError: (error) => {
+      toast.error(error.message)
+    }
+  })
+
+  //Delete Student
+  const deleteMutation = useMutation({
+    mutationFn: deleteStudent,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['students'])
+      console.log("Student Deleted Successfully");
+      toast.success("Student deleted successfully")
+    },
+    onError: (error) => {
+      toast.error(error.message)
+    }
+  })  
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
@@ -86,7 +123,7 @@ export default function App() {
     setIsDialogOpen(true)
   }
 
-  async function handleFormSubmit(e: FormEvent<HTMLFormElement>) {
+   function handleFormSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     const parsed = studentSchema.safeParse(student)
@@ -97,27 +134,16 @@ export default function App() {
     }
 
     if (isEdit) {
-      const data = await updateStudent(student)
-      console.log("Update Student: ",data)
-      setIsEdit(false)
-      setIsDialogOpen(false)
-      toast.success("Student updated successfully")
+      updateMutate.mutate(student)
     }
     else {
-      const data = createStudent(student)
-      console.log("Create Student: ",data)
-      setIsDialogOpen(false)
-      toast.success("Student added successfully")
+      createMutation.mutate(student)
     }
     setStudent({})
-    fetchData()
   }
 
-  async function handleDelete(id: number) {
-    const response = deleteStudent(id)
-    console.log("Delete Student: ",response)
-    toast.success("Student deleted successfully")
-    fetchData()
+   function handleDelete(id: number) {
+    deleteMutation.mutate(id)
   }
 
   async function handleLogout() {
@@ -131,10 +157,14 @@ export default function App() {
     }
   }
 
-  if (loading) {
+  if (error) {
+    toast.error(error.message)
+    return
+  }
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <h1>Loading...</h1>
+        <h1>Loading Students...</h1>
       </div>
     )
   }
@@ -143,7 +173,7 @@ export default function App() {
     <div className=" h-screen w-screen p-16">
 
       <div className="flex justify-end items-center mb-10 px-24 ">
-       <Button variant="destructive" onClick={handleLogout}>Log Out</Button>
+        <Button variant="destructive" onClick={handleLogout}>Log Out</Button>
       </div>
 
       <div className="flex justify-between items-center mb-10 px-24">
@@ -262,7 +292,7 @@ export default function App() {
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          {data.map((item: Student) => { 
+          {students?.map((item: Student) => {
             return (
               <TableBody key={item.id}>
                 <TableRow>
@@ -281,7 +311,7 @@ export default function App() {
                       Edit
                     </Button>
                     <Button variant="destructive"
-                    onClick={() => handleDelete(item.id)}
+                      onClick={() => handleDelete(item.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                       Delete

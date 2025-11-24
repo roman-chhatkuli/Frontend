@@ -4,11 +4,13 @@ const BASE_URL = import.meta.env.VITE_BASE_URL
 
 export const fetchStudents = async () => {
   const response = await fetch(`${BASE_URL}/student`)
-  if (!response.ok) {
-    throw new Error("Failed to fetch students")
+
+  if(!response.ok) {
+    throw new Error('Failed to fetch students')
   }
+
   const data = await response.json()
-  return data
+  return data.data
 }
 
 export const updateStudent = async (student: Student) => {
