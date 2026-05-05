@@ -1,12 +1,12 @@
-import Student from '../App.tsx'
+import type { Student } from "@/App"
 
 const BASE_URL = import.meta.env.VITE_BASE_URL
 
-export const fetchStudents = async () => {
+export const fetchStudents = async (): Promise<Student[]> => {
   const response = await fetch(`${BASE_URL}/student`)
 
-  if(!response.ok) {
-    throw new Error('Failed to fetch students')
+  if (!response.ok) {
+    throw new Error("Failed to fetch students")
   }
 
   const data = await response.json()
@@ -42,18 +42,17 @@ export const createStudent = async (student: Student) => {
     throw new Error("Failed to create student")
   }
 
-  const data = await response.json()
-  return data
+  return response.json()
 }
-
 
 export const deleteStudent = async (id: number) => {
   const response = await fetch(`${BASE_URL}/student/${id}`, {
     method: "DELETE",
   })
+
   if (!response.ok) {
     throw new Error("Failed to delete student")
   }
-  const data = await response.json()
-  return data
+
+  return response.json()
 }

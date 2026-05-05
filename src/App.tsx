@@ -1,45 +1,49 @@
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import * as z from "zod"
+import { useMemo, useState, type ChangeEvent, type FormEvent } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { BookOpen, LogOut, Pencil, Plus, Search, Trash2, Users } from "lucide-react"
+import { toast } from "sonner"
+import { useNavigate } from "react-router-dom"
+import { z } from "zod"
+
+import { createStudent, deleteStudent, fetchStudents, updateStudent } from "@/api/student.api"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Pencil, Trash2 } from "lucide-react"
-import { toast } from "sonner"
-import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/context/authContext"
-import { fetchStudents, deleteStudent, createStudent, updateStudent } from "./api/student.api.ts"
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 export interface Student {
-  id: number;
-  name: string;
-  email: string;
-  age: number;
-  course: string;
-  gpa: number;
-  year: string;
+  id: number
+  name: string
+  email: string
+  age: number
+  course: string
+  gpa: number
+  year: string
 }
 
+const BASE_URL = import.meta.env.VITE_BASE_URL
+
 const studentSchema = z.object({
-  name: z.string().min(1, "Name is required")
+  name: z
+    .string()
+    .min(1, "Name is required")
     .regex(/^[A-Za-z][A-Za-z0-9\s]*$/, "Name must start with a letter and can contain letters, numbers, and spaces"),
   email: z.string().email("Invalid email address"),
   age: z.number().min(1, "Age must be greater than 0"),
@@ -48,82 +52,142 @@ const studentSchema = z.object({
   year: z.string().min(1, "Year is required"),
 })
 
+const initialStudent: Student = {
+  id: 0,
+  name: "",
+  email: "",
+  age: 0,
+  course: "",
+  gpa: 0,
+  year: "",
+}
+
+function StatCard({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <article className="dashboard-stat-card">
+      <p className="dashboard-stat-card__label">{label}</p>
+      <p className="dashboard-stat-card__value">{value}</p>
+      <p className="dashboard-stat-card__note">{note}</p>
+    </article>
+  )
+}
 
 export default function App() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { setUser } = useAuth()
+  const { setUser, user } = useAuth()
 
-  const [student, setStudent] = useState<Student>({} as Student)
-  const [isEdit, setIsEdit] = useState<boolean>(false)
-  const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
+  const [student, setStudent] = useState<Student>(initialStudent)
+  const [isEdit, setIsEdit] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [yearFilter, setYearFilter] = useState("all")
 
-// Fetch Students 
-  const { data: students, error, isLoading } = useQuery({
-    queryKey: ['students'],
+  const { data: students = [], error, isLoading } = useQuery<Student[]>({
+    queryKey: ["students"],
     queryFn: fetchStudents,
   })
 
-  // Edit Students 
-  const updateMutate = useMutation({
+  const updateMutation = useMutation({
     mutationFn: updateStudent,
     onSuccess: () => {
-      queryClient.invalidateQueries(['students'])
-      console.log("Update Student Successful ")
+      queryClient.invalidateQueries({ queryKey: ["students"] })
       setIsEdit(false)
       setIsDialogOpen(false)
+      setStudent(initialStudent)
       toast.success("Student updated successfully")
     },
-    onError: (error) => {
-      toast.error(error.message)
-    }
+    onError: (mutationError: Error) => {
+      toast.error(mutationError.message)
+    },
   })
 
-  //Create Student 
   const createMutation = useMutation({
     mutationFn: createStudent,
     onSuccess: () => {
-      queryClient.invalidateQueries(['students'])
-      console.log("student Created Successfully");
+      queryClient.invalidateQueries({ queryKey: ["students"] })
       setIsDialogOpen(false)
+      setStudent(initialStudent)
       toast.success("Student added successfully")
     },
-    onError: (error) => {
-      toast.error(error.message)
-    }
+    onError: (mutationError: Error) => {
+      toast.error(mutationError.message)
+    },
   })
 
-  //Delete Student
   const deleteMutation = useMutation({
     mutationFn: deleteStudent,
     onSuccess: () => {
-      queryClient.invalidateQueries(['students'])
-      console.log("Student Deleted Successfully");
+      queryClient.invalidateQueries({ queryKey: ["students"] })
       toast.success("Student deleted successfully")
     },
-    onError: (error) => {
-      toast.error(error.message)
-    }
-  })  
+    onError: (mutationError: Error) => {
+      toast.error(mutationError.message)
+    },
+  })
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { id, value, type } = e.target;
+  const filteredStudents = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
 
-    const newValue = type === 'number' ? (parseFloat(value) || 0) : value;
+    return students.filter((item) => {
+      const matchesSearch =
+        query.length === 0 ||
+        item.name.toLowerCase().includes(query) ||
+        item.email.toLowerCase().includes(query) ||
+        item.course.toLowerCase().includes(query)
 
-    setStudent(prevStudent => ({
+      const matchesYear = yearFilter === "all" || item.year === yearFilter
+
+      return matchesSearch && matchesYear
+    })
+  }, [searchQuery, students, yearFilter])
+
+  const yearOptions = useMemo(
+    () => ["all", ...Array.from(new Set(students.map((item) => item.year).filter(Boolean)))],
+    [students],
+  )
+
+  const averageGpa = students.length
+    ? (students.reduce((sum, item) => sum + item.gpa, 0) / students.length).toFixed(2)
+    : "0.00"
+
+  const pendingSave = createMutation.isPending || updateMutation.isPending
+
+  function handleInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const { id, value, type } = e.target
+
+    const newValue = type === "number" ? (value === "" ? 0 : Number(value)) : value
+
+    setStudent((prevStudent) => ({
       ...prevStudent,
-      [id]: newValue
-    }));
-  };
+      [id]: newValue,
+    }))
+  }
 
-  function handleEdit(student: Student) {
-    setStudent(student)
+  function resetDialogState() {
+    setStudent(initialStudent)
+    setIsEdit(false)
+  }
+
+  function openCreateDialog() {
+    resetDialogState()
+    setIsDialogOpen(true)
+  }
+
+  function handleEdit(selectedStudent: Student) {
+    setStudent(selectedStudent)
     setIsEdit(true)
     setIsDialogOpen(true)
   }
 
-   function handleFormSubmit(e: FormEvent<HTMLFormElement>) {
+  function handleDialogChange(open: boolean) {
+    setIsDialogOpen(open)
+    if (!open) {
+      resetDialogState()
+    }
+  }
+
+  function handleFormSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     const parsed = studentSchema.safeParse(student)
@@ -134,195 +198,243 @@ export default function App() {
     }
 
     if (isEdit) {
-      updateMutate.mutate(student)
+      updateMutation.mutate(student)
+      return
     }
-    else {
-      createMutation.mutate(student)
-    }
-    setStudent({})
+
+    createMutation.mutate(student)
   }
 
-   function handleDelete(id: number) {
+  function handleDelete(id: number) {
     deleteMutation.mutate(id)
   }
 
   async function handleLogout() {
-    const response = await fetch(`${BASE_URL}/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    })
-    if (response.ok) {
+    try {
+      const response = await fetch(`${BASE_URL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error("Logout failed")
+      }
+
       setUser(null)
       navigate("/login", { replace: true })
+    } catch (logoutError) {
+      console.error(logoutError)
+      toast.error("Could not log out. Please try again.")
     }
   }
 
-  if (error) {
-    toast.error(error.message)
-    return
-  }
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <h1>Loading Students...</h1>
-      </div>
+      <main className="dashboard-shell dashboard-shell--centered">
+        <section className="dashboard-loading-card" aria-live="polite">
+          <p className="dashboard-loading-card__eyebrow">Loading workspace</p>
+          <h1>Preparing student records...</h1>
+          <p>We are fetching the latest roster so the dashboard opens with current data.</p>
+        </section>
+      </main>
+    )
+  }
+
+  if (error) {
+    return (
+      <main className="dashboard-shell dashboard-shell--centered">
+        <section className="dashboard-loading-card" aria-live="assertive">
+          <p className="dashboard-loading-card__eyebrow">Connection issue</p>
+          <h1>We could not load student records</h1>
+          <p>{error.message}</p>
+        </section>
+      </main>
     )
   }
 
   return (
-    <div className=" h-screen w-screen p-16">
+    <main className="dashboard-shell">
+      <section className="dashboard-hero">
+        <div className="dashboard-hero__copy">
+          <p className="dashboard-hero__eyebrow">Student management workspace</p>
+          <h1>Keep roster updates clear, fast, and easy to act on.</h1>
+          <p className="dashboard-hero__body">
+            Search records, review academic signals, and add or update students without losing context.
+          </p>
+          <div className="dashboard-hero__meta" aria-live="polite">
+            <span>Signed in as {user ?? "Team member"}</span>
+            <span>{filteredStudents.length} visible record{filteredStudents.length === 1 ? "" : "s"}</span>
+          </div>
+        </div>
 
-      <div className="flex justify-end items-center mb-10 px-24 ">
-        <Button variant="destructive" onClick={handleLogout}>Log Out</Button>
-      </div>
+        <div className="dashboard-hero__actions">
+          <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
+            <DialogTrigger asChild>
+              <Button className="dashboard-primary-button" onClick={openCreateDialog}>
+                <Plus className="size-4" />
+                Add student
+              </Button>
+            </DialogTrigger>
 
-      <div className="flex justify-between items-center mb-10 px-24">
-        <h1 className="text-3xl font-bold text-center mb-10">Student Management System</h1>
-        <Dialog open={isDialogOpen} onOpenChange={() => {
-          setIsDialogOpen(!isDialogOpen)
-          setStudent({})
-        }}>
-          <DialogTrigger asChild className="mr-48">
-            <Button>Add Student</Button>
-          </DialogTrigger>
+            <DialogContent className="border-white/10 bg-[#111111] text-white sm:max-w-[640px]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">{isEdit ? "Edit student" : "Add student"}</DialogTitle>
+                <DialogDescription className="text-white/65">
+                  Capture the core academic details so the roster stays accurate and easy to scan.
+                </DialogDescription>
+              </DialogHeader>
 
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>{isEdit ? "Edit" : "Add"} Student</DialogTitle>
-            </DialogHeader>
+              <form onSubmit={handleFormSubmit} className="space-y-5 pt-4">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-white/90">Name</Label>
+                    <Input id="name" value={student.name} onChange={handleInputChange} className="auth-input" required />
+                  </div>
 
-            <form onSubmit={handleFormSubmit} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-white/90">Email</Label>
+                    <Input id="email" type="email" value={student.email} onChange={handleInputChange} className="auth-input" required />
+                  </div>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Name</Label>
-                <Input
-                  id="name"
-                  value={student.name}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  required
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="age" className="text-white/90">Age</Label>
+                    <Input id="age" type="number" value={student.age || ""} onChange={handleInputChange} className="auth-input" min="16" required />
+                  </div>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={student.email}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  required
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="year" className="text-white/90">Year</Label>
+                    <Input id="year" value={student.year} onChange={handleInputChange} className="auth-input" placeholder="Freshman" required />
+                  </div>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="age" className="text-right">Age</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  value={student.age > 0 ? student.age : ''}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  min="16"
-                  required
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="course" className="text-white/90">Course</Label>
+                    <Input id="course" value={student.course} onChange={handleInputChange} className="auth-input" placeholder="Computer Science" required />
+                  </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="gpa" className="text-white/90">GPA</Label>
+                    <Input id="gpa" type="number" step="0.01" value={student.gpa || ""} onChange={handleInputChange} className="auth-input" min="0" max="4" required />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="course" className="text-right">Course</Label>
-                <Input
-                  id="course"
-                  value={student.course}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  required
-                />
-              </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={pendingSave} className="dashboard-primary-button w-full sm:w-auto">
+                    {pendingSave ? "Saving..." : isEdit ? "Save changes" : "Save student"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
 
+          <Button variant="outline" className="dashboard-secondary-button" onClick={handleLogout}>
+            <LogOut className="size-4" />
+            Log out
+          </Button>
+        </div>
+      </section>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="gpa" className="text-right">GPA</Label>
-                <Input
-                  id="gpa"
-                  type="number"
-                  step="0.01"
-                  value={student.gpa > 0 ? student.gpa : ''}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  min="0.0"
-                  max="4.0"
-                  required
-                />
-              </div>
+      <section className="dashboard-stats" aria-label="Roster summary">
+        <StatCard label="Total students" value={String(students.length)} note="Current records in the system" />
+        <StatCard label="Visible now" value={String(filteredStudents.length)} note="After search and year filters" />
+        <StatCard label="Average GPA" value={averageGpa} note="Based on the full current roster" />
+      </section>
 
+      <section className="dashboard-panel">
+        <div className="dashboard-panel__toolbar">
+          <div>
+            <p className="dashboard-panel__eyebrow">Roster</p>
+            <h2>Student records</h2>
+          </div>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="year" className="text-right">Year</Label>
-                <Input
-                  id="year"
-                  type="string"
-                  value={student.year}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  required
-                />
-              </div>
+          <div className="dashboard-filters">
+            <label className="dashboard-search" htmlFor="student-search">
+              <Search className="size-4" />
+              <Input
+                id="student-search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, email, or course"
+                className="border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+              />
+            </label>
 
-              <DialogFooter>
-                <Button type="submit">Save Student</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <label className="dashboard-select-wrap" htmlFor="year-filter">
+              <span className="sr-only">Filter by year</span>
+              <select
+                id="year-filter"
+                value={yearFilter}
+                onChange={(e) => setYearFilter(e.target.value)}
+                className="dashboard-select"
+              >
+                {yearOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === "all" ? "All years" : option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
 
-      <div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">Id</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Age</TableHead>
-              <TableHead>Course</TableHead>
-              <TableHead>GPA</TableHead>
-              <TableHead>Year</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          {students?.map((item: Student) => {
-            return (
-              <TableBody key={item.id}>
-                <TableRow>
-                  <TableCell className="font-medium">{item.id}</TableCell>
-                  <TableCell>{item.name}</TableCell>
-                  <TableCell>{item.email}</TableCell>
-                  <TableCell>{item.age}</TableCell>
-                  <TableCell>{item.course}</TableCell>
-                  <TableCell>{item.gpa}</TableCell>
+        {filteredStudents.length === 0 ? (
+          <div className="dashboard-empty-state" aria-live="polite">
+            <Users className="size-8" />
+            <h3>No student records match the current view</h3>
+            <p>Try a different search term, change the year filter, or add a new student to begin building the roster.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead>
+                <TableHead>Course</TableHead>
+                <TableHead>Year</TableHead>
+                <TableHead>Age</TableHead>
+                <TableHead>GPA</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredStudents.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <div className="dashboard-student-cell">
+                      <p className="dashboard-student-cell__name">{item.name}</p>
+                      <p className="dashboard-student-cell__email">{item.email}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="dashboard-tag">
+                      <BookOpen className="size-3.5" />
+                      {item.course}
+                    </span>
+                  </TableCell>
                   <TableCell>{item.year}</TableCell>
-                  <TableCell className="flex gap-2">
-                    <Button variant="outline"
-                      onClick={() => handleEdit(item)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button variant="destructive"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </Button></TableCell>
+                  <TableCell>{item.age}</TableCell>
+                  <TableCell>{item.gpa.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <div className="dashboard-row-actions">
+                      <Button variant="outline" className="dashboard-table-button" onClick={() => handleEdit(item)}>
+                        <Pencil className="size-4" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="dashboard-delete-button"
+                        onClick={() => handleDelete(item.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableBody>
-            )
-          })}
-        </Table>
-      </div>
-
-    </div>
-  );
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </section>
+    </main>
+  )
 }

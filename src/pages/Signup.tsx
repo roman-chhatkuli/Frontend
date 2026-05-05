@@ -1,5 +1,9 @@
 import { useState } from "react"
-import { cn } from "@/lib/utils"
+import { Link, useNavigate } from "react-router-dom"
+import { toast } from "sonner"
+import { z } from "zod"
+
+import AuthShell from "@/components/AuthShell"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -15,13 +19,10 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
-import * as z from "zod"
-import { useNavigate } from "react-router-dom"
 import { useAuth } from "@/context/authContext"
 
- const userSchema = z.object({
-  fullName: z.string().min(5, "Full name is required and must be at least 5 characters"),
+const userSchema = z.object({
+  fullName: z.string().min(5, "Full name must be at least 5 characters"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 })
@@ -39,7 +40,7 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    if(password !== confirmPassword) {
+    if (password !== confirmPassword) {
       toast.error("Passwords do not match")
       return
     }
@@ -62,126 +63,133 @@ export default function SignupPage() {
       })
 
       const data = await res.json()
-      console.log(data)
 
       if (!res.ok) {
         toast.error(data.message || "Signup failed")
-      } else {
-        toast.success("Account created successfully!")
-        setUser(data.user)
-        navigate("/")
+        return
       }
+
+      toast.success("Account created successfully")
+      setUser(data.user ?? data.email ?? email)
+      navigate("/")
     } catch (err) {
       console.error(err)
-      toast.error("Something went wrong!")
+      toast.error("Something went wrong")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <div className={cn("flex flex-col gap-6")}>
-          <Card>
-            <CardHeader className="text-center">
-              <CardTitle className="text-xl">Create your account</CardTitle>
-              <CardDescription>
-                Enter your details below to create your account
-              </CardDescription>
-            </CardHeader>
+    <AuthShell
+      eyebrow="Guided setup"
+      title="Create a workspace account in one step"
+      description="Set up your access and move directly into the roster dashboard with a cleaner, more focused onboarding flow."
+      asideTitle="Built for smaller admin loops"
+      asideBody="We reduce friction by making the next step obvious, keeping password entry compact, and carrying users directly into the dashboard once registration succeeds."
+      highlights={[
+        "Single-screen account creation",
+        "Immediate entry into the dashboard",
+        "Clear validation before submission",
+      ]}
+    >
+      <Card className="auth-card border-white/10 bg-black/35 shadow-2xl backdrop-blur-xl">
+        <CardHeader className="space-y-3">
+          <p className="auth-card__kicker">Create account</p>
+          <CardTitle className="text-3xl font-semibold tracking-tight text-white">
+            Start managing students
+          </CardTitle>
+          <CardDescription className="max-w-sm text-base text-white/70">
+            Enter a few details below and we will take you straight into the app.
+          </CardDescription>
+        </CardHeader>
 
-            <CardContent>
-              <form onSubmit={handleSubmit}>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="name">Full Name</FieldLabel>
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="John Doe"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                    />
-                  </Field>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="name" className="text-white/90">
+                  Full name
+                </FieldLabel>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Jordan Lee"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  autoComplete="name"
+                  className="auth-input"
+                />
+              </Field>
 
-                  <Field>
-                    <FieldLabel htmlFor="email">Email</FieldLabel>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </Field>
+              <Field>
+                <FieldLabel htmlFor="email" className="text-white/90">
+                  Email
+                </FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@school.edu"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  className="auth-input"
+                />
+              </Field>
 
-                  <Field>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Field>
-                        <FieldLabel htmlFor="password">Password</FieldLabel>
-                        <Input
-                          id="password"
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                        />
-                      </Field>
-                      <Field>
-                        <FieldLabel htmlFor="confirm-password">
-                          Confirm Password
-                        </FieldLabel>
-                        <Input
-                          id="confirm-password"
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) =>
-                            setConfirmPassword(e.target.value)
-                          }
-                          required
-                        />
-                      </Field>
-                    </div>
-                    <FieldDescription>
-                      Must be at least 6 characters long.
-                    </FieldDescription>
-                  </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="password" className="text-white/90">
+                    Password
+                  </FieldLabel>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                    className="auth-input"
+                  />
+                </Field>
 
-                  <Field>
-                    <Button type="submit" disabled={loading} className="w-full">
-                      {loading ? "Creating Account..." : "Create Account"}
-                    </Button>
-                    <FieldDescription className="text-center mt-2">
-                      Already have an account?{" "}
-                      <a
-                        href="/login"
-                        className="underline underline-offset-4 hover:text-primary"
-                      >
-                        Sign in
-                      </a>
-                    </FieldDescription>
-                  </Field>
-                </FieldGroup>
-              </form>
-            </CardContent>
-          </Card>
+                <Field>
+                  <FieldLabel htmlFor="confirm-password" className="text-white/90">
+                    Confirm password
+                  </FieldLabel>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                    className="auth-input"
+                  />
+                </Field>
+              </div>
 
-          <FieldDescription className="px-6 text-center">
-            By clicking continue, you agree to our{" "}
-            <a href="#" className="underline underline-offset-4">
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a href="#" className="underline underline-offset-4">
-              Privacy Policy
-            </a>
-            .
-          </FieldDescription>
-        </div>
-      </div>
-    </div>
+              <FieldDescription className="-mt-2 text-white/55">
+                Use at least 6 characters and keep both password fields identical.
+              </FieldDescription>
+
+              <Field>
+                <Button type="submit" disabled={loading} className="auth-primary-button w-full">
+                  {loading ? "Creating account..." : "Create account"}
+                </Button>
+                <FieldDescription className="pt-2 text-center text-white/65">
+                  Already have an account?{" "}
+                  <Link to="/login" className="font-medium text-[#f4c97a] underline-offset-4 hover:underline">
+                    Sign in
+                  </Link>
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+          </form>
+        </CardContent>
+      </Card>
+    </AuthShell>
   )
 }
